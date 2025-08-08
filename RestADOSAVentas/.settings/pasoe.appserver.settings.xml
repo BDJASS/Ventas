@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<module-content version="12.8">
+    <module id="480373b2-9754-46f8-9dc6-54d0db035ac6" name="RestADOSAVentas">
+        <resource path="AppServer" publish="true"/>
+    </module>
+</module-content>
