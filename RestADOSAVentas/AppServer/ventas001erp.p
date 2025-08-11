@@ -98,6 +98,119 @@ PROCEDURE GetVentas:
             IF Factura.FecReg >= fechaIniActual THEN
                 totalActual = totalActual + Factura.Tot.
             ELSE
+                totalAnterior = totalAnterior + Factura.Tot.           
+        END.
+        
+        /* FACTURAS CONTADO */ 
+        FOR EACH Remision
+            WHERE Remision.Id-Cliente = Cliente.Id-Cliente
+            AND Remision.FecReg >= fechaIniAnterior 
+            AND Remision.FecReg <= fechaFin 
+            AND Remision.FecCancel = ? NO-LOCK:
+                   
+            IF Remision.FecReg >= fechaIniActual THEN
+                totalActual = totalActual + Remision.Tot.
+            ELSE
+                totalAnterior = totalAnterior + Remision.Tot.                       
+        END.        
+
+        IF totalActual > 0 OR totalAnterior > 0 THEN 
+        DO:
+            
+            /* Calcular crecimiento */
+            IF totalAnterior = 0 THEN 
+            DO:
+                IF totalActual = 0 THEN
+                    crecimiento = 0.
+                ELSE
+                    crecimiento = 100.
+            END.
+            ELSE 
+            DO:
+                crecimiento = ((totalActual - totalAnterior) / totalAnterior) * 100.
+            END.
+            
+            /* Determinar acción */
+            IF crecimiento < 0 THEN
+                l-accion = "LLAMAR".
+            ELSE IF crecimiento = 100 THEN
+                    l-accion = "CRECIMIENTO".
+                ELSE
+                    l-accion = "MANTENIMIENTO".
+            
+            CREATE ttVentas.
+            ASSIGN
+                ttVentas.idCliente     = Cliente.Id-Cliente
+                ttVentas.razonSocial   = Cliente.RazonSocial
+                ttVentas.totalActual   = totalActual
+                ttVentas.totalAnterior = totalAnterior
+                ttVentas.crecimiento   = crecimiento
+                ttVentas.idaccion      = l-accion.    
+        END.
+        
+      
+        
+
+    END.  
+    /* Calcular crecimiento y acción por producto */
+
+RETURN.    
+END PROCEDURE.
+@openapi.openedge.export(type="REST", useReturnValue="false", writeDataSetBeforeImage="false").
+PROCEDURE GetDetalleProducto:
+    /*------------------------------------------------------------------------------*/
+    DEFINE INPUT  PARAMETER ip-idCliente  AS INT NO-UNDO.
+    DEFINE INPUT  PARAMETER ip-fechaFin   AS CHARACTER NO-UNDO.
+    DEFINE OUTPUT PARAMETER TABLE FOR ttProductoCliente.
+
+
+    
+    /* Extraer solo la parte de fecha (primeros 10 caracteres) */
+    cFechaISO = SUBSTRING(ip-fechaFin, 1, 10).  /* Resultado: "2025-01-15" */
+
+    /* Reorganizar a un formato que DATE() entienda, por ejemplo "01/15/2025" */
+    cFechaISO = SUBSTRING(cFechaISO, 9, 2) + "/" +  /* DD */ 
+        SUBSTRING(cFechaISO, 6, 2) + "/" +  /* MM */            
+        SUBSTRING(cFechaISO, 1, 4).         /* YYYY */
+
+    /* Convertir a tipo DATE */     
+    fechaFin = DATE(cFechaISO).
+    
+    
+    /* Log inicial de parámetros */
+    LOG-MANAGER:WRITE-MESSAGE("==> GetDetalleProducto. Cliente: " + STRING(ip-idCliente) + 
+        " FechaFin: " + STRING(fechaFin)).
+   
+
+
+    fechaIniActual   = DATE(01,01,YEAR(fechaFin)).
+    fechaIniAnterior = DATE(01,01,YEAR(fechaFin) - 1 ).
+    
+    /* Log inicial de parámetros */
+    LOG-MANAGER:WRITE-MESSAGE("==> GetDetalleProducto. Cliente: " + STRING(ip-idCliente) + 
+        " Fecha Inicial Actual: " + STRING(fechaIniActual) + " Fecha Inicial Anterior: " +  STRING(fechaIniAnterior)).
+       
+                          
+    /* recorrer clientes por vendedor */
+    FOR EACH Cliente WHERE Cliente.Id-Cliente = ip-idCliente 
+        NO-LOCK:  
+
+        /* Reinciar acumuladores por cliente */
+        ASSIGN
+            totalActual   = 0
+            totalAnterior = 0.
+    
+      
+        FOR EACH Factura 
+            WHERE Factura.Id-Cliente = Cliente.Id-Cliente 
+            AND Factura.FecReg >= fechaIniAnterior 
+            AND Factura.FecReg <= fechaFin 
+            AND Factura.FecCancel = ? 
+            NO-LOCK:
+
+            IF Factura.FecReg >= fechaIniActual THEN
+                totalActual = totalActual + Factura.Tot.
+            ELSE
                 totalAnterior = totalAnterior + Factura.Tot.
                 
             /* PRODUCTOS DETALLE */
@@ -250,7 +363,7 @@ PROCEDURE GetVentas:
                     / ttProductoCliente.totalAnterior) * 100.
             END.
         END.
-    END. 
+    END.    
     
     
 
