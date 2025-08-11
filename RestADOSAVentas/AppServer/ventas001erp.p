@@ -13,17 +13,23 @@ DEFINE TEMP-TABLE ttVentas NO-UNDO
     FIELD idaccion      AS CHAR.
     
 DEFINE TEMP-TABLE ttProductoCliente NO-UNDO
+    FIELD idCliente     AS INTEGER
     FIELD Codigo        AS CHARACTER
     FIELD descripcion   AS CHARACTER
     FIELD totalAnterior AS DECIMAL
+    FIELD PropAnterior  AS DECIMAL
     FIELD totalActual   AS DECIMAL  
-    FIELD crecimiento   AS DECIMAL 
-    FIELD idaccion      AS CHAR
+    FIELD PropActual    AS DECIMAL
+    FIELD crecimiento   AS DECIMAL   
     INDEX idx1 Codigo.
      
 DEFINE DATASET dsVentasCliente FOR
     ttVentas,
-    ttProductoCliente.
+    ttProductoCliente
+    DATA-RELATION drClienteProducto
+    FOR ttVentas, ttProductoCliente
+    RELATION-FIELDS(idCliente, idCliente)
+    NESTED.
     
 DEFINE VARIABLE totalActual      AS DECIMAL   NO-UNDO .
 DEFINE VARIABLE totalAnterior    AS DECIMAL   NO-UNDO .
@@ -101,13 +107,15 @@ PROCEDURE GetVentas:
                 USE-INDEX Idx-Fac :
 
                 FIND FIRST ttProductoCliente
-                    WHERE  ttProductoCliente.Codigo = detfactura.Id-Articulo
+                    WHERE  ttProductoCliente.idCliente = Cliente.Id-Cliente
+                    AND  ttProductoCliente.Codigo    = detfactura.Id-Articulo
                     NO-ERROR.
 
                 IF NOT AVAILABLE ttProductoCliente THEN 
                 DO:
                     CREATE ttProductoCliente.
                     ASSIGN
+                        ttProductoCliente.idCliente   = Cliente.Id-Cliente
                         ttProductoCliente.Codigo      = detfactura.Id-Articulo
                         ttProductoCliente.descripcion = detfactura.Descr.
                 END.
@@ -140,13 +148,15 @@ PROCEDURE GetVentas:
                 AND DetRemis.Importe > 0 NO-LOCK: 
 
                 FIND FIRST ttProductoCliente
-                    WHERE  ttProductoCliente.Codigo = DetRemis.Id-Articulo
+                    WHERE  ttProductoCliente.idCliente = Cliente.Id-Cliente
+                    AND    ttProductoCliente.Codigo    = DetRemis.Id-Articulo
                     NO-ERROR.
 
                 IF NOT AVAILABLE ttProductoCliente THEN 
                 DO:
                     CREATE ttProductoCliente.
                     ASSIGN
+                        ttProductoCliente.idCliente   = Cliente.Id-Cliente
                         ttProductoCliente.Codigo      = DetRemis.Id-Articulo
                         ttProductoCliente.descripcion = DetRemis.Descr.
                 END.
@@ -156,7 +166,7 @@ PROCEDURE GetVentas:
                 ELSE
                     ttProductoCliente.totalAnterior = ttProductoCliente.totalAnterior + (DetRemis.Importe + DetRemis.Iva).
             END.                      
-        END.       
+        END.        
 
         IF totalActual > 0 OR totalAnterior > 0 THEN 
         DO:
@@ -197,8 +207,32 @@ PROCEDURE GetVentas:
 
     END.  
     /* Calcular crecimiento y acción por producto */
-        
+     
+      
     FOR EACH ttProductoCliente:
+        
+        FIND FIRST ttVentas 
+            WHERE ttVentas.idCliente = ttProductoCliente.idCliente
+            NO-LOCK NO-ERROR.
+
+        /* Calcular proporciones */
+        IF AVAILABLE ttVentas THEN 
+        DO:
+            IF ttVentas.totalAnterior > 0 THEN
+                ttProductoCliente.PropAnterior = 
+                    (ttProductoCliente.totalAnterior / ttVentas.totalAnterior) * 100.
+            ELSE
+                ttProductoCliente.PropAnterior = 0.
+
+            IF ttVentas.totalActual > 0 THEN
+                ttProductoCliente.PropActual = 
+                    (ttProductoCliente.totalActual / ttVentas.totalActual) * 100.
+            ELSE
+                ttProductoCliente.PropActual = 0.
+        END. 
+    
+    
+    
         IF ttProductoCliente.totalActual > 0 OR ttProductoCliente.totalAnterior > 0 THEN 
         DO:
 
@@ -215,15 +249,9 @@ PROCEDURE GetVentas:
                 ttProductoCliente.crecimiento = ((ttProductoCliente.totalActual - ttProductoCliente.totalAnterior) 
                     / ttProductoCliente.totalAnterior) * 100.
             END.
-
-            /* Determinar acción */
-            IF ttProductoCliente.crecimiento < 0 THEN
-                ttProductoCliente.idaccion = "LLAMAR".
-            ELSE IF ttProductoCliente.crecimiento = 100 THEN
-                    ttProductoCliente.idaccion = "CRECIMIENTO".
-                ELSE
-                    ttProductoCliente.idaccion = "MANTENIMIENTO".
         END.
-    END.   
+    END. 
+    
+    
 
 END PROCEDURE.
