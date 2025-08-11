@@ -44,7 +44,7 @@ DEFINE VARIABLE l-accion         AS CHARACTER NO-UNDO.
 /* ***************************  Main Procedure  ************************** */
 
 @openapi.openedge.export(type="REST", useReturnValue="false", writeDataSetBeforeImage="false").
-PROCEDURE GetVentas:
+PROCEDURE GetVentas:  
     /*------------------------------------------------------------------------------*/
     DEFINE INPUT  PARAMETER ip-idVendedor AS CHARACTER NO-UNDO.
     DEFINE INPUT  PARAMETER ip-fechaFin   AS CHARACTER NO-UNDO.
