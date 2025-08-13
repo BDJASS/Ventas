@@ -379,7 +379,5 @@ PROCEDURE GetDetalleProducto:
             END.
         END.
     END.    
-    
-    
-
+RETURN.    
 END PROCEDURE.
