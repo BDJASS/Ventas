@@ -10,18 +10,22 @@ DEFINE TEMP-TABLE ttVentas NO-UNDO
     FIELD totalAnterior AS DECIMAL
     FIELD totalActual   AS DECIMAL
     FIELD crecimiento   AS DECIMAL
-    FIELD idaccion      AS CHAR.
+    FIELD idaccion      AS CHAR
+    FIELD Segmento      LIKE Cliente.Id-Segmento
+    FIELD Tel           AS CHAR.
     
 DEFINE TEMP-TABLE ttProductoCliente NO-UNDO
     FIELD idCliente     AS INTEGER
     FIELD Codigo        AS CHARACTER
+    FIELD idColor       LIKE detfactura.Id-color
+    FIELD ColorDesc     AS CHARACTER
     FIELD descripcion   AS CHARACTER
     FIELD totalAnterior AS DECIMAL
     FIELD PropAnterior  AS DECIMAL
     FIELD totalActual   AS DECIMAL  
     FIELD PropActual    AS DECIMAL
-    FIELD crecimiento   AS DECIMAL   
-    INDEX idx1 Codigo.
+    FIELD crecimiento   AS DECIMAL     
+    INDEX idx1 Codigo.  
      
 DEFINE DATASET dsVentasCliente FOR
     ttVentas,
@@ -138,6 +142,7 @@ PROCEDURE GetVentas:
                 ELSE
                     l-accion = "MANTENIMIENTO".
             
+              
             CREATE ttVentas.
             ASSIGN
                 ttVentas.idCliente     = Cliente.Id-Cliente
@@ -145,7 +150,9 @@ PROCEDURE GetVentas:
                 ttVentas.totalActual   = totalActual
                 ttVentas.totalAnterior = totalAnterior
                 ttVentas.crecimiento   = crecimiento
-                ttVentas.idaccion      = l-accion.    
+                ttVentas.idaccion      = l-accion
+                ttVentas.Segmento      = Cliente.Id-Segmento
+                ttVentas.Tel           = Cliente.Tel1 + " " + Cliente.Tel2 + " " + Cliente.Tel3.    
         END.
         
       
@@ -219,18 +226,22 @@ PROCEDURE GetDetalleProducto:
                 AND detFactura.Importe > 0  
                 USE-INDEX Idx-Fac :
 
-                FIND FIRST ttProductoCliente
-                    WHERE  ttProductoCliente.idCliente = Cliente.Id-Cliente
-                    AND  ttProductoCliente.Codigo    = detfactura.Id-Articulo
-                    NO-ERROR.
+                FIND FIRST  ttProductoCliente
+                     WHERE  ttProductoCliente.idCliente = Cliente.Id-Cliente
+                       AND  ttProductoCliente.Codigo    = detfactura.Id-Articulo
+                       AND  ttProductoCliente.IdColor   = detfactura.Id-Color  /* <-- nuevo filtro */
+                       NO-ERROR.
 
                 IF NOT AVAILABLE ttProductoCliente THEN 
                 DO:
+                    FIND FIRST Kolor WHERE Kolor.Id-color = detfactura.Id-Color NO-LOCK NO-ERROR.
                     CREATE ttProductoCliente.
                     ASSIGN
                         ttProductoCliente.idCliente   = Cliente.Id-Cliente
                         ttProductoCliente.Codigo      = detfactura.Id-Articulo
-                        ttProductoCliente.descripcion = detfactura.Descr.
+                        ttProductoCliente.IdColor     = detfactura.Id-Color
+                        ttProductoCliente.ColorDesc   = IF AVAILABLE Kolor THEN Kolor.Descr ELSE ""
+                        ttProductoCliente.descripcion = detfactura.Descr. 
                 END.
 
                 IF Factura.FecReg >= fechaIniActual THEN
@@ -261,18 +272,22 @@ PROCEDURE GetDetalleProducto:
                 AND DetRemis.Importe > 0 NO-LOCK: 
 
                 FIND FIRST ttProductoCliente
-                    WHERE  ttProductoCliente.idCliente = Cliente.Id-Cliente
-                    AND    ttProductoCliente.Codigo    = DetRemis.Id-Articulo
+                     WHERE  ttProductoCliente.idCliente = Cliente.Id-Cliente
+                       AND  ttProductoCliente.Codigo    = DetRemis.Id-Articulo
+                       AND  ttProductoCliente.IdColor   = DetRemis.Id-color  /* <-- nuevo filtro */
                     NO-ERROR.
 
                 IF NOT AVAILABLE ttProductoCliente THEN 
                 DO:
+                    FIND FIRST Kolor WHERE Kolor.Id-color = DetRemis.Id-color NO-LOCK NO-ERROR.
                     CREATE ttProductoCliente.
                     ASSIGN
                         ttProductoCliente.idCliente   = Cliente.Id-Cliente
                         ttProductoCliente.Codigo      = DetRemis.Id-Articulo
+                        ttProductoCliente.IdColor     = DetRemis.Id-color
+                        ttProductoCliente.ColorDesc   = IF AVAILABLE Kolor THEN Kolor.Descr ELSE ""
                         ttProductoCliente.descripcion = DetRemis.Descr.
-                END.
+                END.  
 
                 IF Remision.FecReg >= fechaIniActual THEN
                     ttProductoCliente.totalActual = ttProductoCliente.totalActual + (DetRemis.Importe + DetRemis.Iva).
