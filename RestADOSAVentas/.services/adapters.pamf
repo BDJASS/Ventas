@@ -29,6 +29,30 @@
   &lt;/mapping:mapOutput>&#xD;
   &lt;mapping:mapFault name=&quot;default_fault&quot;/>&#xD;
 &lt;/mapping:messageMapping></lm:properties>
+            <lm:properties name="_VentasPorClienteDetalle::ventas001erp..GetDetalleProducto::GET">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xD;
+&lt;mapping:messageMapping xmlns:mapping=&quot;http://www.progress.com/caf/mapping1.0&quot; xmlns:metadata=&quot;http://www.progress.com/caf/mapping1.0/toolingMetadata&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;>&#xD;
+  &lt;metadata:toolingMetadata>&#xD;
+    &lt;metadata:mapInput>&#xD;
+      &lt;metadata:source>&#xD;
+        &lt;metadata:mappablesData displayName=&quot;IdCliente&quot; expressionName=&quot;${rest.queryparam['IdCliente']}&quot; mappableType=&quot;MANUAL&quot;/>&#xD;
+        &lt;metadata:mappablesData displayName=&quot;Fecha&quot; expressionName=&quot;${rest.queryparam['Fecha']}&quot; mappableType=&quot;MANUAL&quot;/>&#xD;
+      &lt;/metadata:source>&#xD;
+      &lt;metadata:target/>&#xD;
+    &lt;/metadata:mapInput>&#xD;
+    &lt;metadata:mapOutput>&#xD;
+      &lt;metadata:source/>&#xD;
+      &lt;metadata:target/>&#xD;
+    &lt;/metadata:mapOutput>&#xD;
+  &lt;/metadata:toolingMetadata>&#xD;
+  &lt;mapping:mapInput>&#xD;
+    &lt;mapping:rule action=&quot;None&quot; resource=&quot;&quot; source=&quot;${rest.queryparam['IdCliente']}&quot; target=&quot;${idl.param['ipIdCliente']}&quot; type=&quot;INTERFACE_PARAM&quot;/>&#xD;
+    &lt;mapping:rule action=&quot;None&quot; resource=&quot;&quot; source=&quot;${rest.queryparam['Fecha']}&quot; target=&quot;${idl.param['ipFechaFin']}&quot; type=&quot;INTERFACE_PARAM&quot;/>&#xD;
+  &lt;/mapping:mapInput>&#xD;
+  &lt;mapping:mapOutput>&#xD;
+    &lt;mapping:rule action=&quot;None&quot; resource=&quot;&quot; source=&quot;${idl.param['ttProductoCliente']}&quot; target=&quot;${http.body}&quot; type=&quot;INTERFACE_PARAM&quot;/>&#xD;
+  &lt;/mapping:mapOutput>&#xD;
+  &lt;mapping:mapFault name=&quot;default_fault&quot;/>&#xD;
+&lt;/mapping:messageMapping></lm:properties>
             <lm:properties name="applicationRelativePath">/RestADOSAVentas</lm:properties>
           </lm:properties>
         </lm:adapterDetails>

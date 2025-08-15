@@ -6,4 +6,10 @@
       <prgs:param name="Fecha" type="QUERY"/>
     </prgs:operation>
   </prgs:resource>
+  <prgs:resource consumes="application/json" name="_VentasPorClienteDetalle" path="/VentasPorClienteDetalle" produces="application/json">
+    <prgs:operation consumes="application/json" idls="RestADOSAVentas/.services/AppServer/ventas001erp.pidl::com.progress.openedge.pdt.bpmbindings" name="ventas001erp..GetDetalleProducto" produces="application/json" verb="GET">
+      <prgs:param name="IdCliente" type="QUERY"/>
+      <prgs:param name="Fecha" type="QUERY"/>
+    </prgs:operation>
+  </prgs:resource>
 </prgs:model>
