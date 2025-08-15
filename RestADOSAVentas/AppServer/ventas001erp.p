@@ -41,6 +41,7 @@ DEFINE VARIABLE totalAnterior    AS DECIMAL   NO-UNDO .
 DEFINE VARIABLE fechaFin         AS DATE      NO-UNDO.
 DEFINE VARIABLE fechaIniActual   AS DATE      NO-UNDO.
 DEFINE VARIABLE fechaIniAnterior AS DATE      NO-UNDO.
+DEFINE VARIABLE fechaFinAnterior AS DATE      NO-UNDO.
 
 DEFINE VARIABLE cFechaISO        AS CHARACTER NO-UNDO.
 DEFINE VARIABLE crecimiento      AS DECIMAL   NO-UNDO.
@@ -76,12 +77,16 @@ PROCEDURE GetVentas:
 
     fechaIniActual   = DATE(01,01,YEAR(fechaFin)).
     fechaIniAnterior = DATE(01,01,YEAR(fechaFin) - 1 ).
+    fechaFinAnterior = DATE(MONTH(fechaFin), DAY(fechaFin), YEAR(fechaFin) - 1).
     
-    /* Log inicial de parámetros */
-    LOG-MANAGER:WRITE-MESSAGE("==> GetVentas ejecutado. IdVendedor: " + ip-idVendedor + 
-        " Fecha Inicial Actual: " + STRING(fechaIniActual) + " Fecha Inicial Anterior: " +  STRING(fechaIniAnterior)).
-    
-                          
+    /* Log inicial */
+    LOG-MANAGER:WRITE-MESSAGE(
+        "==> GetVentas ejecutado. IdVendedor: " + ip-idVendedor +
+        " FechaIniActual: "   + STRING(fechaIniActual) +
+        " FechaFinActual: "   + STRING(fechaFin) +
+        " FechaIniAnterior: " + STRING(fechaIniAnterior) +
+        " FechaFinAnterior: " + STRING(fechaFinAnterior)
+        ).       
     /* recorrer clientes por vendedor */
     FOR EACH Cliente WHERE Cliente.Id-Vendedor = ip-idVendedor 
         NO-LOCK:
@@ -100,9 +105,13 @@ PROCEDURE GetVentas:
             NO-LOCK:
 
             IF Factura.FecReg >= fechaIniActual THEN
-                totalActual = totalActual + Factura.Tot.
-            ELSE
-                totalAnterior = totalAnterior + Factura.Tot.           
+                /* Actual */
+                totalActual = totalActual + Factura.SubTotal.
+            ELSE IF Factura.FecReg <= fechaFinAnterior THEN
+                    /* Anterior */
+                    totalAnterior = totalAnterior + Factura.SubTotal.
+        /* Si no entra en ninguna, es porque cae en los días posteriores a fechaFinAnterior 
+           pero antes de fechaIniActual, así que no la contamos */        
         END.
         
         /* FACTURAS CONTADO */ 
@@ -113,9 +122,13 @@ PROCEDURE GetVentas:
             AND Remision.FecCancel = ? NO-LOCK:
                    
             IF Remision.FecReg >= fechaIniActual THEN
-                totalActual = totalActual + Remision.Tot.
-            ELSE
-                totalAnterior = totalAnterior + Remision.Tot.                       
+                /* Actual */
+                totalActual = totalActual + Remision.SubTotal.
+            ELSE IF Remision.FecReg <= fechaFinAnterior THEN
+                    /* Anterior (mismo rango que actual, pero un año antes) */
+                    totalAnterior = totalAnterior + Remision.SubTotal.
+        /* Si no cumple ninguna, es que está después de fechaFinAnterior pero antes de fechaIniActual,
+           y no entra en ningún rango de comparación */                     
         END.        
 
         IF totalActual > 0 OR totalAnterior > 0 THEN 
@@ -161,7 +174,7 @@ PROCEDURE GetVentas:
     END.  
     /* Calcular crecimiento y acción por producto */
 
-RETURN.    
+    RETURN.    
 END PROCEDURE.
 @openapi.openedge.export(type="REST", useReturnValue="false", writeDataSetBeforeImage="false").
 PROCEDURE GetDetalleProducto:
@@ -192,6 +205,8 @@ PROCEDURE GetDetalleProducto:
 
     fechaIniActual   = DATE(01,01,YEAR(fechaFin)).
     fechaIniAnterior = DATE(01,01,YEAR(fechaFin) - 1 ).
+    fechaFinAnterior = DATE(MONTH(fechaFin), DAY(fechaFin), YEAR(fechaFin) - 1).
+    
     
     /* Log inicial de parámetros */
     LOG-MANAGER:WRITE-MESSAGE("==> GetDetalleProducto. Cliente: " + STRING(ip-idCliente) + 
@@ -216,9 +231,14 @@ PROCEDURE GetDetalleProducto:
             NO-LOCK:
 
             IF Factura.FecReg >= fechaIniActual THEN
-                totalActual = totalActual + Factura.Tot.
-            ELSE
-                totalAnterior = totalAnterior + Factura.Tot.
+                /* Actual */
+                totalActual = totalActual + Factura.SubTotal.
+            ELSE IF Factura.FecReg <= fechaFinAnterior THEN
+                    /* Anterior */
+                    totalAnterior = totalAnterior + Factura.SubTotal.
+            ELSE 
+                /* NO ESTA EN EL RANGO, SALTAR FACTURA */
+                NEXT.
                 
             /* PRODUCTOS DETALLE */
             FOR EACH detfactura NO-LOCK
@@ -227,10 +247,10 @@ PROCEDURE GetDetalleProducto:
                 USE-INDEX Idx-Fac :
 
                 FIND FIRST  ttProductoCliente
-                     WHERE  ttProductoCliente.idCliente = Cliente.Id-Cliente
-                       AND  ttProductoCliente.Codigo    = detfactura.Id-Articulo
-                       AND  ttProductoCliente.IdColor   = detfactura.Id-Color  /* <-- nuevo filtro */
-                       NO-ERROR.
+                    WHERE  ttProductoCliente.idCliente = Cliente.Id-Cliente
+                    AND  ttProductoCliente.Codigo    = detfactura.Id-Articulo
+                    AND  ttProductoCliente.IdColor   = detfactura.Id-Color  /* <-- nuevo filtro */
+                    NO-ERROR.
 
                 IF NOT AVAILABLE ttProductoCliente THEN 
                 DO:
@@ -244,10 +264,10 @@ PROCEDURE GetDetalleProducto:
                         ttProductoCliente.descripcion = detfactura.Descr. 
                 END.
 
-                IF Factura.FecReg >= fechaIniActual THEN
-                    ttProductoCliente.totalActual = ttProductoCliente.totalActual + (detfactura.Importe + detfactura.Iva).
+                IF Factura.FecReg >= fechaIniActual THEN              
+                    ttProductoCliente.totalActual = ttProductoCliente.totalActual + detfactura.Importe.
                 ELSE
-                    ttProductoCliente.totalAnterior = ttProductoCliente.totalAnterior + (detfactura.Importe + detfactura.Iva).
+                    ttProductoCliente.totalAnterior = ttProductoCliente.totalAnterior + detfactura.Importe.
             END.              
         END.
         
@@ -259,10 +279,14 @@ PROCEDURE GetDetalleProducto:
             AND Remision.FecCancel = ? NO-LOCK:
                    
             IF Remision.FecReg >= fechaIniActual THEN
-                totalActual = totalActual + Remision.Tot.
-            ELSE
-                totalAnterior = totalAnterior + Remision.Tot.  
-             
+                /* Actual */
+                totalActual = totalActual + Remision.SubTotal.
+            ELSE IF Remision.FecReg <= fechaFinAnterior THEN
+                    /* Anterior (mismo rango que actual, pero un año antes) */
+                    totalAnterior = totalAnterior + Remision.SubTotal. 
+            ELSE 
+                /* NO ESTA EN EL RANGO, SALTAR REMISION */
+                NEXT.
              
             /* PRODUCTOS DETALLE */
             
@@ -272,9 +296,9 @@ PROCEDURE GetDetalleProducto:
                 AND DetRemis.Importe > 0 NO-LOCK: 
 
                 FIND FIRST ttProductoCliente
-                     WHERE  ttProductoCliente.idCliente = Cliente.Id-Cliente
-                       AND  ttProductoCliente.Codigo    = DetRemis.Id-Articulo
-                       AND  ttProductoCliente.IdColor   = DetRemis.Id-color  /* <-- nuevo filtro */
+                    WHERE  ttProductoCliente.idCliente = Cliente.Id-Cliente
+                    AND  ttProductoCliente.Codigo    = DetRemis.Id-Articulo
+                    AND  ttProductoCliente.IdColor   = DetRemis.Id-color  /* <-- nuevo filtro */
                     NO-ERROR.
 
                 IF NOT AVAILABLE ttProductoCliente THEN 
@@ -290,9 +314,9 @@ PROCEDURE GetDetalleProducto:
                 END.  
 
                 IF Remision.FecReg >= fechaIniActual THEN
-                    ttProductoCliente.totalActual = ttProductoCliente.totalActual + (DetRemis.Importe + DetRemis.Iva).
+                    ttProductoCliente.totalActual = ttProductoCliente.totalActual + DetRemis.Importe .
                 ELSE
-                    ttProductoCliente.totalAnterior = ttProductoCliente.totalAnterior + (DetRemis.Importe + DetRemis.Iva).
+                    ttProductoCliente.totalAnterior = ttProductoCliente.totalAnterior + DetRemis.Importe.
             END.                      
         END.        
 
@@ -378,6 +402,6 @@ PROCEDURE GetDetalleProducto:
                     / ttProductoCliente.totalAnterior) * 100.
             END.
         END.
-    END.    
-RETURN.    
+    END.       
+    RETURN.    
 END PROCEDURE.
